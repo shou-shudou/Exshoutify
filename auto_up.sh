@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Folder project
-cd /data/data/com.termux/files/home/folder_script  # Ganti sesuai path folder scriptmu
+cd /data/data/com.termux/files/home/github  # Ganti sesuai path folder scriptmu
 
 # Tambahkan semua perubahan
 git add .
