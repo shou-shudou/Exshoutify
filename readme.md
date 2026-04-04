@@ -38,7 +38,7 @@ Aplikasi downloader musik yang powerful, lengkap, dan production-ready untuk Spo
 # Clone repository
 cd ~/storage/downloads
 git clone https://github.com/shouShudou/exshoutify.git
-cd music-downloader-termux
+cd exshoutify
 
 # Run installation script
 bash install.sh
