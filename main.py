@@ -272,25 +272,25 @@ def main():
         epilog="""
 Examples:
   # Download single Spotify track
-  python main.py "https://open.spotify.com/track/..."
+  python3 main.py "https://open.spotify.com/track/..."
   
   # Download YouTube video
-  python main.py "https://www.youtube.com/watch?v=..."
+  python3 main.py "https://www.youtube.com/watch?v=..."
   
   # Download album
-  python main.py "https://open.spotify.com/album/..."
+  python3 main.py "https://open.spotify.com/album/..."
   
   # Download with FLAC format
-  python main.py "url" --format flac
+  python3 main.py "url" --format flac
   
   # Download multiple URLs from file
-  python main.py --batch urls.txt
+  python3 main.py --batch urls.txt
   
   # Organized folder structure
-  python main.py "url" --organize
+  python3 main.py "url" --organize
   
   # Parallel download
-  python main.py --batch urls.txt --parallel
+  python3 main.py --batch urls.txt --parallel
         """
     )
     
