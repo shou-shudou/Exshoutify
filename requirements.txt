@@ -1,17 +1,7 @@
-# Downloader libraries - Compatible dengan Python 3.13
-spotdl==4.3.1
 yt-dlp>=2024.1.1
-
-# Audio processing
 mutagen>=1.46.0
-pillow>=10.0.0
-
-# Networking
+Pillow>=10.0.0
 requests>=2.31.0
-
-# CLI & logging
 colorama>=0.4.6
 tqdm>=4.66.0
-
-# Optional
 python-dotenv>=1.0.0
