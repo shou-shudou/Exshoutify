@@ -1,0 +1,17 @@
+# Downloader libraries
+spotdl==4.11.0
+yt-dlp==2024.1.1
+
+# Audio processing
+mutagen==1.46.0
+pillow==10.1.0
+
+# Networking
+requests==2.31.0
+
+# CLI & logging
+colorama==0.4.6
+tqdm==4.66.1
+
+# Optional untuk better performance
+python-dotenv==1.0.0
