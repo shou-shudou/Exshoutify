@@ -213,12 +213,12 @@ bash install.sh
 ### Out of storage
 Clean temporary files:
 ```bash
-rm -rf ~/.music_downloader/temp/*
+rm -rf ~/.exhsoutify/temp/*
 ```
 
 ## 📝 Logging
 
-Logs disimpan di: `~/.music_downloader/logs/`
+Logs disimpan di: `~/.exshoutify/logs/`
 
 Format:
 ```
