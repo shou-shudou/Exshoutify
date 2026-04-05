@@ -1,208 +1,93 @@
 """
-YouTube downloader - menggunakan yt-dlp untuk download dari YouTube
+YouTube downloader menggunakan yt-dlp
 """
-import subprocess
-import json
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Optional
 from utils.logger import logger
-from utils.config import TEMP_DIR, YOUTUBE_CONFIG
 
 
 class YouTubeDownloader:
-    """Handle download dari YouTube menggunakan yt-dlp"""
+    """Downloader untuk YouTube videos dan playlists"""
     
     @staticmethod
     def check_ytdlp() -> bool:
-        """
-        Check apakah yt-dlp tersedia
-        
-        Returns:
-            True jika yt-dlp tersedia, False jika tidak
-        """
+        """Check apakah yt-dlp terinstall"""
         try:
-            result = subprocess.run(
-                ['yt-dlp', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                logger.debug(f"yt-dlp is available: {result.stdout.strip()}")
-                return True
+            import subprocess
+            result = subprocess.run(['yt-dlp', '--version'], capture_output=True)
+            return result.returncode == 0
+        except FileNotFoundError:
             return False
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            logger.error("yt-dlp not found. Install with: pip install yt-dlp")
-            return False
-    
-    @staticmethod
-    def get_video_info(video_url: str) -> Optional[Dict]:
-        """
-        Get informasi video dari YouTube URL
-        
-        Args:
-            video_url: URL ke YouTube video
-        
-        Returns:
-            Dictionary berisi info video atau None jika gagal
-        """
-        try:
-            logger.debug(f"Fetching YouTube video info: {video_url}")
-            
-            cmd = [
-                'yt-dlp',
-                '--dump-json',
-                '--no-warnings',
-                video_url
-            ]
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=YOUTUBE_CONFIG['timeout']
-            )
-            
-            if result.returncode == 0:
-                info = json.loads(result.stdout)
-                return {
-                    'title': info.get('title', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'channel': info.get('uploader', 'Unknown'),
-                    'upload_date': info.get('upload_date', 'Unknown')
-                }
-            else:
-                logger.warning(f"Failed to get video info: {result.stderr}")
-                return None
-        
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse video info")
-            return None
-        except Exception as e:
-            logger.warning(f"Error getting video info: {e}")
-            return None
     
     @staticmethod
     def download_video(
-        video_url: str,
-        output_file: Path,
+        url: str,
+        output_path: Path,
         audio_format: str = 'mp3',
-        audio_quality: Optional[int] = None
+        audio_quality: int = 320
     ) -> Optional[Path]:
-        """
-        Download audio dari YouTube video
-        
-        Args:
-            video_url: URL ke YouTube video
-            output_file: Path untuk menyimpan hasil download
-            audio_format: Format audio (mp3/wav/m4a, default: mp3)
-            audio_quality: Kualitas audio dalam kbps
-        
-        Returns:
-            Path ke downloaded file jika sukses, None jika gagal
-        """
+        """Download single YouTube video"""
         try:
-            output_file.parent.mkdir(parents=True, exist_ok=True)
+            import subprocess
             
-            logger.info(f"Downloading YouTube audio: {video_url}")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Build yt-dlp command untuk extract audio
             cmd = [
                 'yt-dlp',
-                '--extract-audio',
-                '--audio-format', audio_format,
-                '--audio-quality', str(audio_quality) if audio_quality else '192',
-                '--output', str(output_file.parent / '%(title)s.%(ext)s'),
-                '--no-warnings',
-                video_url
+                '-x',
+                '--audio-format', audio_format.lower(),
+                '--audio-quality', f'{audio_quality}K',
+                '-o', str(output_path.with_suffix('')),
+                url
             ]
             
-            logger.debug(f"Running command: {' '.join(cmd)}")
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=YOUTUBE_CONFIG['timeout']
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
                 # Find downloaded file
-                downloaded_files = list(output_file.parent.glob(f'*.{audio_format}'))
-                if downloaded_files:
-                    downloaded_file = downloaded_files[-1]  # Get latest file
-                    logger.info(f"Video downloaded successfully: {downloaded_file.name}")
-                    return downloaded_file
+                for file in output_path.parent.glob(f'*{output_path.stem}*'):
+                    if file.suffix.lower() == f'.{audio_format.lower()}':
+                        return file
             else:
-                logger.error(f"YouTube download failed: {result.stderr}")
+                logger.error(f"yt-dlp error: {result.stderr}")
                 return None
         
-        except subprocess.TimeoutExpired:
-            logger.error("YouTube download timeout")
-            return None
         except Exception as e:
             logger.error(f"Error downloading YouTube video: {e}")
             return None
     
     @staticmethod
     def download_playlist(
-        playlist_url: str,
+        url: str,
         output_dir: Path,
         audio_format: str = 'mp3',
-        audio_quality: Optional[int] = None,
-        limit: Optional[int] = None
+        audio_quality: int = 320
     ) -> List[Path]:
-        """
-        Download playlist dari YouTube
-        
-        Args:
-            playlist_url: URL ke YouTube playlist
-            output_dir: Directory untuk menyimpan hasil download
-            audio_format: Format audio
-            audio_quality: Kualitas audio dalam kbps
-            limit: Maksimal jumlah video (None = all)
-        
-        Returns:
-            List Path ke downloaded files
-        """
+        """Download YouTube playlist"""
         try:
-            output_dir.mkdir(parents=True, exist_ok=True)
+            import subprocess
             
-            logger.info(f"Downloading YouTube playlist: {playlist_url}")
+            output_dir.mkdir(parents=True, exist_ok=True)
             
             cmd = [
                 'yt-dlp',
-                '--extract-audio',
-                '--audio-format', audio_format,
-                '--audio-quality', str(audio_quality) if audio_quality else '192',
-                '--output', str(output_dir / '%(playlist)s' / '%(title)s.%(ext)s'),
-                '--no-warnings',
-                playlist_url
+                '-x',
+                '--audio-format', audio_format.lower(),
+                '--audio-quality', f'{audio_quality}K',
+                '-o', str(output_dir / '%(title)s'),
+                url
             ]
             
-            if limit:
-                cmd.extend(['--playlist-items', f'1-{limit}'])
-            
-            logger.debug(f"Running command: {' '.join(cmd)}")
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=1800  # 30 menit
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
-                downloaded_files = list(output_dir.rglob(f'*.{audio_format}'))
-                logger.info(f"Playlist downloaded: {len(downloaded_files)} videos")
-                return downloaded_files
+                files = list(output_dir.glob(f'*.{audio_format.lower()}'))
+                return files
             else:
-                logger.error(f"Playlist download failed: {result.stderr}")
+                logger.error(f"yt-dlp error: {result.stderr}")
                 return []
         
-        except subprocess.TimeoutExpired:
-            logger.error("Playlist download timeout")
-            return []
         except Exception as e:
-            logger.error(f"Error downloading playlist: {e}")
+            logger.error(f"Error downloading YouTube playlist: {e}")
             return []
+```
