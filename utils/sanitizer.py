@@ -1,56 +1,84 @@
 """
-Sanitizer untuk filename - menghapus karakter ilegal
+Sanitizer utility untuk filename dan path
 """
 import re
-from utils.config import ILLEGAL_CHARS
+from pathlib import Path
 
 
-def sanitize_filename(filename: str, max_length: int = 200) -> str:
+def sanitize_filename(filename: str, max_length: int = 255) -> str:
     """
-    Sanitize filename dengan menghapus karakter ilegal
+    Sanitize filename untuk semua OS
     
     Args:
-        filename: Nama file yang akan di-sanitize
-        max_length: Maksimal panjang filename
+        filename: Filename yang akan di-sanitize
+        max_length: Maximum length untuk filename
     
     Returns:
-        Filename yang sudah di-sanitize
+        Sanitized filename
     """
-    # Hapus karakter ilegal
-    sanitized = re.sub(ILLEGAL_CHARS, "", filename)
+    # Remove invalid characters
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1f]'
+    filename = re.sub(invalid_chars, '', filename)
     
-    # Hapus leading/trailing spaces dan dots
-    sanitized = sanitized.strip('. ')
+    # Replace multiple spaces dengan single space
+    filename = re.sub(r'\s+', ' ', filename)
     
-    # Ganti multiple spaces dengan single space
-    sanitized = re.sub(r'\s+', ' ', sanitized)
+    # Remove leading/trailing spaces dan dots
+    filename = filename.strip('. ')
     
-    # Truncate jika terlalu panjang (simpan extension)
-    if len(sanitized) > max_length:
-        name, ext = sanitized.rsplit('.', 1) if '.' in sanitized else (sanitized, '')
-        name = name[:max_length - len(ext) - 1]
-        sanitized = f"{name}.{ext}" if ext else name
+    # Limit length
+    if len(filename) > max_length:
+        filename = filename[:max_length].rsplit(' ', 1)[0]
     
-    return sanitized
+    # Ensure not empty
+    if not filename:
+        filename = 'untitled'
+    
+    return filename
 
 
-def sanitize_path_part(path_part: str) -> str:
+def sanitize_path_part(path_part: str, max_length: int = 100) -> str:
     """
-    Sanitize bagian dari path (artist, album, dll)
+    Sanitize path part (folder name)
     
     Args:
-        path_part: Bagian path yang akan di-sanitize
+        path_part: Path part yang akan di-sanitize
+        max_length: Maximum length untuk folder name
     
     Returns:
-        Path part yang sudah di-sanitize
+        Sanitized path part
     """
-    sanitized = re.sub(ILLEGAL_CHARS, "", path_part)
-    sanitized = sanitized.strip('. ')
-    sanitized = re.sub(r'\s+', ' ', sanitized)
+    # Remove invalid characters
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1f]'
+    path_part = re.sub(invalid_chars, '', path_part)
     
-    # Truncate untuk path part yang terlalu panjang
-    if len(sanitized) > 100:
-        sanitized = sanitized[:100]
+    # Replace multiple spaces
+    path_part = re.sub(r'\s+', ' ', path_part)
     
-    return sanitized
-```
+    # Remove leading/trailing spaces dan dots
+    path_part = path_part.strip('. ')
+    
+    # Limit length
+    if len(path_part) > max_length:
+        path_part = path_part[:max_length].rsplit(' ', 1)[0]
+    
+    # Ensure not empty
+    if not path_part:
+        path_part = 'unknown'
+    
+    return path_part
+
+
+def sanitize_path(path_str: str) -> str:
+    """
+    Sanitize full path
+    
+    Args:
+        path_str: Path yang akan di-sanitize
+    
+    Returns:
+        Sanitized path
+    """
+    path = Path(path_str)
+    parts = [sanitize_path_part(part) for part in path.parts]
+    return str(Path(*parts))
