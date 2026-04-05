@@ -3,6 +3,7 @@ Music Downloader Termux - Main CLI Application
 Aplikasi lengkap untuk download musik dari Spotify dan YouTube
 """
 import sys
+import shutil
 import argparse
 from pathlib import Path
 from typing import List, Optional
@@ -22,7 +23,7 @@ from utils.config import DOWNLOAD_DIR, ORGANIZED_DOWNLOAD_DIR, BATCH_CONFIG, AUD
 class MusicDownloader:
     """Main application class untuk download musik"""
     
-    def __init__(self, quality: int = 320, audio_format: str = 'mp3', organize: bool = False):
+    def __init__(self, quality: int = 320, audio_format: str = 'mp3', organize: bool = False, output_dir: Optional[Path] = None):
         """
         Initialize Music Downloader
         
@@ -30,11 +31,19 @@ class MusicDownloader:
             quality: Audio quality dalam kbps (default: 320)
             audio_format: Audio format (mp3/flac, default: mp3)
             organize: Organize downloads ke folder Artist/Album (default: False)
+            output_dir: Custom output directory (optional)
         """
         self.quality = quality
         self.audio_format = audio_format
         self.organize = organize
-        self.output_dir = ORGANIZED_DOWNLOAD_DIR if organize else DOWNLOAD_DIR
+        
+        # Set output directory
+        if output_dir:
+            self.output_dir = Path(output_dir)
+        else:
+            self.output_dir = ORGANIZED_DOWNLOAD_DIR if organize else DOWNLOAD_DIR
+        
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Check dependencies
         self._check_dependencies()
@@ -112,8 +121,9 @@ class MusicDownloader:
                     audio_format=self.audio_format,
                     audio_quality=self.quality
                 )
+                # FIX: Return all results, not just first one
                 results = [self._process_downloaded_file(f) for f in downloaded_files]
-                return results[0] if results else None
+                return results
             
             elif content_type == 'playlist':
                 downloaded_files = SpotifyDownloader.download_playlist(
@@ -121,8 +131,9 @@ class MusicDownloader:
                     audio_format=self.audio_format,
                     audio_quality=self.quality
                 )
+                # FIX: Return all results, not just first one
                 results = [self._process_downloaded_file(f) for f in downloaded_files]
-                return results[0] if results else None
+                return results
         
         except Exception as e:
             logger.error(f"Spotify download error: {e}")
@@ -151,8 +162,9 @@ class MusicDownloader:
                     audio_format='mp3',
                     audio_quality=self.quality
                 )
+                # FIX: Return all results, not just first one
                 results = [self._process_downloaded_file(f) for f in downloaded_files]
-                return results[0] if results else None
+                return results
         
         except Exception as e:
             logger.error(f"YouTube download error: {e}")
@@ -204,9 +216,9 @@ class MusicDownloader:
                         logger.error("Conversion failed")
                         return None
             else:
-                # Move file
+                # FIX: Use shutil.move() for cross-disk safety
                 output_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.rename(output_path)
+                shutil.move(str(file_path), str(output_path))
             
             # Embed metadata
             MetadataProcessor.embed_metadata(output_path, metadata)
@@ -249,7 +261,11 @@ class MusicDownloader:
                     try:
                         result = future.result()
                         if result:
-                            successful.append(result)
+                            # Handle both single file and list of files
+                            if isinstance(result, list):
+                                successful.extend([r for r in result if r])
+                            else:
+                                successful.append(result)
                     except Exception as e:
                         logger.error(f"Error downloading {url}: {e}")
         else:
@@ -258,7 +274,11 @@ class MusicDownloader:
                 logger.info(f"[{i}/{len(urls)}] Downloading...")
                 result = self.download_single(url)
                 if result:
-                    successful.append(result)
+                    # Handle both single file and list of files
+                    if isinstance(result, list):
+                        successful.extend([r for r in result if r])
+                    else:
+                        successful.append(result)
         
         logger.info(f"Batch download completed: {len(successful)}/{len(urls)} successful")
         return successful
@@ -291,6 +311,9 @@ Examples:
   
   # Parallel download
   python3 main.py --batch urls.txt --parallel
+  
+  # Custom output directory
+  python3 main.py "url" --output /path/to/directory
         """
     )
     
@@ -345,13 +368,22 @@ Examples:
     downloader = MusicDownloader(
         quality=args.quality,
         audio_format=args.format,
-        organize=args.organize
+        organize=args.organize,
+        output_dir=Path(args.output) if args.output else None  # FIX: Use output_dir parameter
     )
     
     try:
         # Single download
         if args.url:
-            downloader.download_single(args.url)
+            result = downloader.download_single(args.url)  # FIX: Capture result
+            if result:
+                if isinstance(result, list):
+                    logger.info(f"✓ Downloaded {len(result)} file(s)")
+                else:
+                    logger.info(f"✓ Download successful: {result}")
+            else:
+                logger.error("Download failed")
+                sys.exit(1)
         
         # Batch download
         elif args.batch:
@@ -367,7 +399,12 @@ Examples:
                 logger.error("No URLs found in batch file")
                 return
             
-            downloader.download_batch(urls, parallel=args.parallel)
+            results = downloader.download_batch(urls, parallel=args.parallel)
+            if results:
+                logger.info(f"✓ Successfully downloaded {len(results)} file(s)")
+            else:
+                logger.error("No files were downloaded")
+                sys.exit(1)
     
     except KeyboardInterrupt:
         logger.warning("\nDownload cancelled by user")
@@ -379,3 +416,4 @@ Examples:
 
 if __name__ == '__main__':
     main()
+```
