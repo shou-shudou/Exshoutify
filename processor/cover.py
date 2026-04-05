@@ -1,131 +1,90 @@
 """
-Cover art processor - download dan embed album cover
+Cover processor untuk download dan embed album cover
 """
-import requests
 from pathlib import Path
-from PIL import Image
-from io import BytesIO
 from typing import Optional
 from utils.logger import logger
-from utils.config import TEMP_DIR
 
 
 class CoverProcessor:
-    """Handle album cover download dan embedding"""
+    """Download dan embed album cover"""
     
     @staticmethod
-    def download_cover(cover_url: str, output_path: Optional[Path] = None) -> Optional[Path]:
+    def download_cover(url: str, output_path: Path) -> bool:
         """
-        Download album cover dari URL
+        Download cover dari URL
         
         Args:
-            cover_url: URL ke cover image
-            output_path: Path untuk save cover (optional)
+            url: URL ke cover image
+            output_path: Path untuk save cover
         
         Returns:
-            Path ke cover image jika sukses, None jika gagal
+            True jika berhasil, False jika gagal
         """
         try:
-            if not cover_url:
-                logger.debug("No cover URL provided")
-                return None
+            import requests
             
-            logger.info(f"Downloading cover from: {cover_url}")
+            response = requests.get(url, timeout=10)
             
-            response = requests.get(cover_url, timeout=10)
-            response.raise_for_status()
-            
-            # Save cover image
-            if output_path is None:
-                output_path = TEMP_DIR / "cover_temp.jpg"
-            
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_path, 'wb') as f:
-                f.write(response.content)
-            
-            logger.debug(f"Cover saved to: {output_path}")
-            return output_path
-        
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Failed to download cover: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error downloading cover: {e}")
-            return None
-    
-    @staticmethod
-    def optimize_cover(cover_path: Path, max_size: int = 500000) -> Path:
-        """
-        Optimize cover image (resize, compress)
-        
-        Args:
-            cover_path: Path ke cover image
-            max_size: Maksimal ukuran file dalam bytes
-        
-        Returns:
-            Path ke cover yang sudah di-optimize
-        """
-        try:
-            logger.debug(f"Optimizing cover: {cover_path.name}")
-            
-            img = Image.open(cover_path)
-            
-            # Resize jika terlalu besar (max 500x500)
-            max_dimension = 500
-            if img.width > max_dimension or img.height > max_dimension:
-                img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
-            
-            # Convert ke RGB jika RGBA
-            if img.mode in ('RGBA', 'LA', 'P'):
-                rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-                rgb_img.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                img = rgb_img
-            
-            # Save dengan compression
-            optimized_path = cover_path.parent / "cover_optimized.jpg"
-            
-            quality = 95
-            while True:
-                img.save(optimized_path, 'JPEG', quality=quality)
-                
-                if optimized_path.stat().st_size <= max_size or quality <= 50:
-                    break
-                
-                quality -= 5
-            
-            logger.debug(f"Cover optimized: {optimized_path.stat().st_size / 1024:.1f} KB")
-            
-            return optimized_path
-        
-        except Exception as e:
-            logger.error(f"Error optimizing cover: {e}")
-            return cover_path
-    
-    @staticmethod
-    def validate_cover(cover_path: Path) -> bool:
-        """
-        Validasi cover image
-        
-        Args:
-            cover_path: Path ke cover image
-        
-        Returns:
-            True jika valid, False jika tidak
-        """
-        try:
-            if not cover_path.exists():
+            if response.status_code == 200:
+                with open(output_path, 'wb') as f:
+                    f.write(response.content)
+                logger.debug(f"Cover downloaded: {output_path}")
+                return True
+            else:
+                logger.warning(f"Failed to download cover: HTTP {response.status_code}")
                 return False
-            
-            img = Image.open(cover_path)
-            # Validasi minimal resolution
-            if img.width < 100 or img.height < 100:
-                logger.warning(f"Cover too small: {img.width}x{img.height}")
-                return False
-            
-            return True
         
         except Exception as e:
-            logger.warning(f"Invalid cover image: {e}")
+            logger.warning(f"Error downloading cover: {e}")
             return False
-
+    
+    @staticmethod
+    def embed_cover(audio_file: Path, cover_path: Path) -> bool:
+        """
+        Embed cover ke audio file
+        
+        Args:
+            audio_file: Path ke audio file
+            cover_path: Path ke cover image
+        
+        Returns:
+            True jika berhasil, False jika gagal
+        """
+        try:
+            from mutagen.id3 import ID3, APIC
+            from PIL import Image
+            
+            if not cover_path.exists():
+                logger.warning(f"Cover file not found: {cover_path}")
+                return False
+            
+            # Verify it's a valid image
+            try:
+                Image.open(cover_path)
+            except Exception:
+                logger.warning(f"Invalid image file: {cover_path}")
+                return False
+            
+            # Add cover to ID3 (for MP3)
+            if audio_file.suffix.lower() == '.mp3':
+                audio = ID3(str(audio_file))
+                with open(cover_path, 'rb') as f:
+                    audio.add(APIC(
+                        encoding=3,
+                        mime='image/jpeg',
+                        type=3,
+                        desc='',
+                        data=f.read()
+                    ))
+                audio.save()
+                logger.debug(f"Cover embedded: {audio_file.name}")
+                return True
+            else:
+                logger.warning(f"Cover embedding not supported for {audio_file.suffix}")
+                return False
+        
+        except Exception as e:
+            logger.warning(f"Error embedding cover: {e}")
+            return False
+```
